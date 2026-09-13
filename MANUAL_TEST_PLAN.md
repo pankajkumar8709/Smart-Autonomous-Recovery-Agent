@@ -106,10 +106,15 @@ the Vite proxy picks it up automatically.
 
 **Action:** Watch the Verify node / read the Trail.
 **Expected:**
-- Trail shows `VerifyNode: SUCCESS - RAW check: stock=<N>kg (safety=<M>kg, ok=True), cold-chain ok=True`.
+- Trail shows `VerifyNode: SUCCESS - RAW check: stock=<N>kg (safety=<M>kg, ok=True), cold-chain ok=True, record check: ...` — the record check names the mutated record the agent re-GET (order / transfer / shipment / reservation, per action type).
 - The stock number in the SUCCESS line equals what GET `/inventory/...` returns — the
   agent verified by reading real state (Read-After-Write), not by trusting its own plan.
 - Result banner shows **RECOVERED**.
+- **Tamper check (Phase 3, optional):** after a REROUTE recovery, revert the shipment
+  with `POST /api/v1/shipments/IMP-JNPT-8802/status {"status":"CUSTOMS_HOLD"}` — a
+  subsequent verify against the recorded result reports
+  `record check failed` and triggers replan (locked in by automated tests:
+  `test_tampered_shipment_revert_caught_by_verify`, `test_vanished_allocation_caught_by_verify`).
 
 ## PS bullet 7 — Replan when an alternative fails / a new disruption occurs
 
@@ -155,13 +160,15 @@ the next option or escalates instead of over-committing.
 ```powershell
 python -m pytest -v      # sandbox must be running (set SANDBOX_PORT if not on :8000)
 ```
-**Expected: 36 passed** — 22 unit (8 optimizer/governance + 14 pure discovery
-engine) + 14 integration driving the real agent against the sandbox: all four
+**Expected: 39 passed** — 22 unit (8 optimizer/governance + 14 pure discovery
+engine) + 17 integration driving the real agent against the sandbox: all four
 action types, the replan loops, environment-as-source-of-truth, sandbox-down
-escalation, vendor stock-out/certification discovery, and `/environment/apply`.
+escalation, vendor stock-out/certification discovery, `/environment/apply`, and
+the Phase 3 tamper tests (reverted shipment / vanished allocation caught by RAW
+re-GET).
 
 ## Pass criteria
 The application satisfies PS-6 if: all 7 bullets above show their EXPECTED result,
 the stock number genuinely changes in the sandbox after execution, the reefer replan
-loop fires on its own, the vendor stock-out is discovered (never told), and
-`pytest -v` is 36/36 green.
+loop fires on its own, the vendor stock-out is discovered (never told), a tampered
+record is caught by verification, and `pytest -v` is 39/39 green.

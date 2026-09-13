@@ -391,6 +391,40 @@ def verify_node(state: SupplyState) -> Dict[str, Any]:
 
     call_ok = res.get("status") in ["DISPATCHED", "ORDERED", "REROUTED", "RESERVED"]
 
+    # Phase 3 — complete Read-After-Write: re-GET the exact record each action
+    # type mutated. A success status in the POST response is a claim; the fresh
+    # GET of the mutated record is the proof. A vanished/reverted record fails
+    # verification into the replan loop, honestly.
+    record_ok = True
+    record_note = "n/a"
+    if call_ok and res.get("order_id"):
+        order = _get(f"/orders/{res['order_id']}")
+        record_ok = order is not None and order.get("status") == "ORDERED" \
+            and order.get("vendor_id") == res.get("vendor_id")
+        record_note = f"order {res['order_id']} re-GET: {'ok' if record_ok else 'MISMATCH/MISSING'}"
+    elif call_ok and res.get("reservation_id"):
+        alloc = _get(f"/allocations/{res['reservation_id']}")
+        record_ok = alloc is not None and \
+            float(alloc.get("quantity_kg", 0.0)) == float(res.get("quantity_kg", -1.0))
+        record_note = f"reservation {res['reservation_id']} re-GET: {'ok' if record_ok else 'VANISHED/MISMATCH'}"
+    elif call_ok and res.get("shipment_id") and res.get("new_eta"):
+        shipment = _get(f"/shipments/{res['shipment_id']}")
+        record_ok = shipment is not None and \
+            shipment.get("status") in ("REROUTED", "IN_TRANSIT")
+        record_note = f"shipment {res['shipment_id']} re-GET: status={shipment.get('status') if shipment else 'MISSING'}"
+
+    if call_ok and not record_ok:
+        return {
+            "verified": False,
+            "replan_count": state.get("replan_count", 0) + 1,
+            "invalidated_options": [res.get("option_id")],
+            "inventory_state": fresh_inv,
+            "audit_trail": [
+                f"VerifyNode: FAILURE - RAW record check failed ({record_note}); "
+                "the mutated record did not hold. Triggering replan."
+            ],
+        }
+
     # Recovery gate: the sandbox call succeeded, cold-chain is intact, AND — when
     # the disruption was a stock problem — stock has genuinely recovered. This is
     # what stops a REROUTE/ALLOCATE (which add no physical stock) from being
@@ -405,7 +439,8 @@ def verify_node(state: SupplyState) -> Dict[str, Any]:
             "inventory_state": fresh_inv,
             "audit_trail": [
                 f"VerifyNode: SUCCESS - RAW check: stock={fresh_inv['current_stock_kg']}kg "
-                f"(safety={fresh_inv['safety_stock_kg']}kg, ok={stock_ok}), cold-chain ok={cold_chain_ok}."
+                f"(safety={fresh_inv['safety_stock_kg']}kg, ok={stock_ok}), cold-chain "
+                f"ok={cold_chain_ok}, record check: {record_note}."
             ],
         }
     return {
@@ -415,7 +450,7 @@ def verify_node(state: SupplyState) -> Dict[str, Any]:
         "inventory_state": fresh_inv,
         "audit_trail": [
             f"VerifyNode: FAILURE - call_ok={call_ok}, cold_chain_ok={cold_chain_ok}, "
-            f"stock_ok={stock_ok} (needed={stock_disruption}). Triggering replan."
+            f"stock_ok={stock_ok} (needed={stock_disruption}), record: {record_note}. Triggering replan."
         ],
     }
 

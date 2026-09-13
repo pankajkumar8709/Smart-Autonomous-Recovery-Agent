@@ -70,6 +70,10 @@ def _load_snapshot() -> bool:
             snap = json.load(f)
         if not isinstance(snap, dict) or not snap.get("inventory"):
             return False   # empty/corrupt — fall back to seed
+        # Heal collections added after the snapshot was written (forward compat).
+        for key, default in (("transfers", {}), ("allocations", {}), ("demand", {}),
+                             ("vendors", {}), ("lanes", []), ("orders", {})):
+            snap.setdefault(key, default)
         DB.clear()
         DB.update(snap)
         return True
@@ -97,6 +101,7 @@ DB.setdefault("allocations", {})
 DB.setdefault("demand", {})   # facility_id -> demand signal (Phase 1)
 DB.setdefault("vendors", {})
 DB.setdefault("lanes", [])
+DB.setdefault("orders", {})   # order_id -> purchase record (Phase 3: RAW re-GET)
 
 SNAPSHOT_RESTORED = _load_snapshot()
 
@@ -139,11 +144,9 @@ def _reset_db():
         fresh = json.load(f)
     DB.clear()
     DB.update(fresh)
-    DB.setdefault("transfers", {})
-    DB.setdefault("allocations", {})
-    DB.setdefault("demand", {})
-    DB.setdefault("vendors", {})
-    DB.setdefault("lanes", [])
+    for key, default in (("transfers", {}), ("allocations", {}), ("demand", {}),
+                         ("vendors", {}), ("lanes", []), ("orders", {})):
+        DB.setdefault(key, default)
     IDEMPOTENCY_CACHE.clear()
     _save_snapshot()   # a reset is a mutation too — persist it
 
@@ -222,6 +225,38 @@ def get_transfer(transfer_id: str):
 
 
 # ----------------------------------------------------------------------------
+# Phase 3: RAW verification targets — verify_node re-GETs the record each
+# action type mutated before claiming success.
+# ----------------------------------------------------------------------------
+@app.get("/api/v1/orders/{order_id}")
+def get_order(order_id: str):
+    order = DB.get("orders", {}).get(order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="ORDER_NOT_FOUND")
+    return order
+
+
+@app.get("/api/v1/allocations/{reservation_id}")
+def get_allocation(reservation_id: str):
+    alloc = DB.get("allocations", {}).get(reservation_id)
+    if not alloc:
+        raise HTTPException(status_code=404, detail="ALLOCATION_NOT_FOUND")
+    return alloc
+
+
+@app.delete("/api/v1/allocations/{reservation_id}")
+def cancel_allocation(reservation_id: str):
+    """Out-of-band allocation cancellation (tamper path for Phase 3 tests):
+    the reservation vanishes exactly as a real ERP-side cancellation would.
+    The agent's re-GET must discover the disappearance — never be told."""
+    alloc = DB.get("allocations", {}).pop(reservation_id, None)
+    if alloc is None:
+        raise HTTPException(status_code=404, detail="ALLOCATION_NOT_FOUND")
+    _save_snapshot()
+    return {"reservation_id": reservation_id, "status": "CANCELLED"}
+
+
+# ----------------------------------------------------------------------------
 # State-changing endpoints — one per PS action type
 # ----------------------------------------------------------------------------
 @app.post("/api/v1/transfers/dispatch")
@@ -279,6 +314,7 @@ def purchase_order(payload: PurchaseRequest, x_idempotency_key: str = Header(...
         "mode": payload.transport_mode,
         "ordered_at": datetime.now(timezone.utc).isoformat(),
     }
+    DB.setdefault("orders", {})[order_id] = response   # persist so GET /orders/{id} works (Phase 3)
     IDEMPOTENCY_CACHE[x_idempotency_key] = response
     _save_snapshot()
     return response
@@ -509,6 +545,7 @@ def read_state():
         "demand": list(DB.get("demand", {}).values()),
         "vendors": list(DB.get("vendors", {}).values()),
         "lanes": list(DB.get("lanes", [])),
+        "orders": list(DB.get("orders", {}).values()),
     }
 
 

@@ -106,10 +106,11 @@ Switch tabs to make the point concrete:
 python -m pytest -v      # sandbox must be running (set SANDBOX_PORT if not on :8000)
 ```
 
-> "36 automated tests, all green. Fourteen drive the *real* agent against the live
+> "39 automated tests, all green. Seventeen drive the *real* agent against the live
 > sandbox: all four action types, both replan loops, environment-as-source-of-truth,
-> sandbox-down escalation, and vendor condition changes — so this behavior is locked
-> in, not a one-time lucky run."
+> sandbox-down escalation, vendor condition changes, and tamper tests that revert
+> sandbox state behind the agent's back and prove its read-after-write check catches
+> it — so this behavior is locked in, not a one-time lucky run."
 
 ---
 

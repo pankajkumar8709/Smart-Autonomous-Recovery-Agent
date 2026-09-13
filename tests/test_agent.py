@@ -579,6 +579,103 @@ def test_environment_apply_endpoint_sets_up_without_running():
 
 @integration
 @needs_sandbox
+def test_tampered_shipment_revert_caught_by_verify(fresh_graph):
+    """Phase 3 tamper proof: after a REROUTE recovery, reverting the shipment's
+    status OUT-OF-BAND (the environment changed under the agent) must be caught
+    by verify_node's own re-GET — the run replans instead of claiming success."""
+    import httpx
+
+    from agent_graph import verify_node
+
+    _reset("shipment_only")
+    final = _run(fresh_graph)
+    assert final["verified"] is True
+    assert final["optimal_plan"]["type"] == "REROUTE"
+
+    # Out-of-band revert: customs slaps the hold back on AFTER the agent's verify.
+    r = httpx.post(f"{SANDBOX}/shipments/IMP-JNPT-8802/status",
+                   json={"status": "CUSTOMS_HOLD"}, timeout=2.0)
+    assert r.status_code == 200
+
+    # Resume verify with the recorded execution result — the re-GET must see the
+    # reverted world and fail honestly into the replan path.
+    out = verify_node({
+        "execution_result": {
+            **final["execution_result"],
+            "new_eta": final["optimal_plan"]["new_eta"],
+        },
+        "inventory_state": final["inventory_state"],
+        "disruption_info": {"reasons": ["SHIPMENT_CUSTOMS_HOLD"]},
+        "replan_count": 0,
+    })
+    assert out["verified"] is False
+    assert any("record check failed" in line for line in out["audit_trail"])
+
+
+@integration
+@needs_sandbox
+def test_vanished_allocation_caught_by_verify(fresh_graph):
+    """Phase 3 tamper proof: after an ALLOCATE recovery, cancelling the
+    reservation out-of-band must make verify_node's re-GET fail — the agent
+    never claims a recovery whose underlying record has vanished."""
+    import httpx
+
+    from agent_graph import verify_node
+
+    _reset("demand_surge")
+    httpx.post(f"{SANDBOX}/demand/signal", json={
+        "facility_id": "FAC-HYD-GENOME", "sku_id": "API-AMX-9901",
+        "observed_daily_burn_kg": 540.0, "forecast_daily_burn_kg": 300.0,
+        "surge_ratio": 1.8,
+    }, timeout=2.0)
+    final = _run(fresh_graph, shipment_state={"shipment_id": "IMP-JNPT-8802"}, demand_state={})
+    assert final["verified"] is True
+    assert final["optimal_plan"]["type"] == "ALLOCATE"
+    reservation_id = final["execution_result"].get("reservation_id")
+    assert reservation_id
+
+    # Out-of-band cancellation (ERP-side), then re-verify.
+    r = httpx.delete(f"{SANDBOX}/allocations/{reservation_id}", timeout=2.0)
+    assert r.status_code == 200
+
+    out = verify_node({
+        "execution_result": final["execution_result"],
+        "inventory_state": final["inventory_state"],
+        "disruption_info": {"reasons": ["DEMAND_SURGE"]},
+        "replan_count": 0,
+    })
+    assert out["verified"] is False
+    assert any("VANISHED" in line for line in out["audit_trail"])
+
+
+@integration
+@needs_sandbox
+def test_order_persisted_and_verifiable(fresh_graph):
+    """Phase 3: a PURCHASE run's order record is really persisted — GET
+    /orders/{id} returns it, and verify_node's re-GET confirms it (order id in
+    the execution result matches the persisted record)."""
+    import httpx
+
+    _reset("stock_breach")
+    final = _run(fresh_graph)
+    assert final["verified"] is True
+    order_id = final["execution_result"].get("order_id")
+    if order_id:   # PURCHASE path taken
+        order = httpx.get(f"{SANDBOX}/orders/{order_id}", timeout=2.0).json()
+        assert order["status"] == "ORDERED"
+        assert order["vendor_id"] == final["execution_result"]["vendor_id"]
+        # And verify_node agrees via its own re-GET.
+        out = verify_node({
+            "execution_result": final["execution_result"],
+            "inventory_state": final["inventory_state"],
+            "disruption_info": {"reasons": ["SAFETY_STOCK_BREACH"]},
+            "replan_count": 0,
+        })
+        assert out["verified"] is True
+
+
+@integration
+@needs_sandbox
 def test_demand_signal_not_found_defaults_to_baseline(fresh_graph):
     """Phase 1: GET /demand/{id} 404 (no signal recorded) must degrade to a
     baseline surge_ratio of 1.0 in observe_node — not crash, not fake a surge."""

@@ -1,12 +1,14 @@
 # Build Plan — PS-6 Recovery Agent: "Real, No Fake" Completion
 
-> **Status: Phases 0–6 + 7 COMPLETE** (all tested; 36 tests green — 22 unit +
-> 14 integration). Verification protocol followed per phase; see `README.md`
+> **Status: ALL PHASES (0–7) COMPLETE** (39 tests green — 22 unit +
+> 17 integration). Verification protocol followed per phase; see `README.md`
 > for the current architecture and `MANUAL_TEST_PLAN.md` for the acceptance
-> walkthrough. Phase 7 delivered sandbox/run-history persistence (`PERSISTENCE.md`),
-> git init + .gitignore, and GitHub Actions CI (unit / integration with booted
-> ephemeral sandbox / dashboard build). Phase 3 (complete Read-After-Write per
-> action type + tamper tests) remains open as the last substantive follow-up.
+> walkthrough. Phase 3 closed last: orders persisted + `GET /orders/{id}` and
+> `GET /allocations/{id}` (+ out-of-band `DELETE /allocations/{id}`),
+> verify_node re-GETs the order/shipment/reservation per action type, and
+> tamper tests prove a server-side revert or vanished record is caught by the
+> agent's own re-GET and fails into replan. Only the optional dependency
+> refresh (langgraph/fastapi) remains, post-acceptance.
 
 Goal: close every gap between the current codebase and a literal reading of
 `problem-statement.md`, so that every input the agent reasons over is **read from
@@ -176,7 +178,7 @@ from live sandbox data, priced by a real calculator.
 but editing `seed_data.json` (vendor stock, lane speed) changes the agent's
 options, prices, and choices.
 
-### Phase 3 — Complete Read-After-Write verification (fixes G4)
+### Phase 3 — Complete Read-After-Write verification (fixes G4) — **DONE**
 **Goal:** bullet 6 in full: verify inventory AND delivery state, per action type.
 
 - Sandbox: `GET /api/v1/allocations/{id}`; persist orders and add

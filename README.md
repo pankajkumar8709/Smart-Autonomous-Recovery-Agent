@@ -66,7 +66,7 @@ resumes mid-flow rather than restarting.
 | Investigate vendors/routes/allocations | `candidates.build_candidates` from `GET /vendors` + `GET /routes`, priced via `POST /tools/cost-carbon`; computed deficit `max(0, safety−current) + surge buffer`; editing seed data changes the option set |
 | Optimize feasible actions | `optimizer.evaluate_and_optimize` (hard-bound filter → cost/time/carbon score); uncertified vendor investigated then rejected by the filter |
 | Execute reroute/purchase/allocate/transfer | `execute_node` (4 real idempotent endpoints); quantities computed from the deficit |
-| Verify inventory + delivery state | `verify_node` (Read-After-Write GET on inventory + transfer record; recovery gate: stock disruptions require stock to clear the floor) |
+| Verify inventory + delivery state | `verify_node` — per-action RAW re-GET of the mutated record: PURCHASE → `GET /orders/{id}` (status ORDERED, vendor matches), REROUTE → `GET /shipments/{id}` (status REROUTED/IN_TRANSIT), ALLOCATE → `GET /allocations/{id}` (exists, quantity matches), TRANSFER → `GET /transfers/{id}` (+ reefer temp); plus inventory RAW read and the recovery gate (stock disruptions require stock to clear the floor). Tamper tests prove a server-side revert or vanished record is caught and fails into replan |
 | Replan on failure / new disruption | verify-fail loop + governance-reject loop (both exclude the failed option) + stage re-entry for the vendor stock-out; all three disruptions are real environment events |
 
 ## Run
@@ -110,7 +110,7 @@ on 8001 via `SANDBOX_PORT=8001` (sandbox, tests, and Vite proxy all honor it).
 | `agent_graph.py` | LangGraph state machine (the agent) with `_get`/`_post` graceful degradation |
 | `scenarios.py` | Demo runners: `python scenarios.py [vendor]` |
 | `dashboard-react/` | React 19 + styled-components dashboard (Vite, light theme; see its own README) |
-| `tests/test_agent.py` | 8 unit (optimizer/governance) + 14 integration (all 4 action types, replan loops, environment-as-truth, sandbox-down escalation, vendor conditions, `/environment/apply`) |
+| `tests/test_agent.py` | 8 unit (optimizer/governance) + 17 integration (all 4 action types, replan loops, environment-as-truth, sandbox-down escalation, vendor conditions, `/environment/apply`, per-action RAW re-GET + tamper tests) |
 | `tests/test_candidates.py` | 14 unit tests for the discovery engine (deficit math, deterministic pricing, live-data filters, uncertified passthrough) |
 | `pytest.ini` | pytest config (registers the `integration` marker) |
 | `PERSISTENCE.md` | Persistence design notes (snapshot semantics, escape hatches, demo implications) |
