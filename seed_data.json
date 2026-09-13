@@ -1,0 +1,87 @@
+{
+  "inventory": {
+    "FAC-HYD-GENOME": {
+      "facility_id": "FAC-HYD-GENOME",
+      "name": "Hyderabad Genome Valley Cold Store",
+      "city": "Hyderabad",
+      "sku_id": "API-AMX-9901",
+      "current_stock_kg": 1200.0,
+      "safety_stock_kg": 4000.0,
+      "storage_temp_celsius": 4.0
+    },
+    "FAC-VIZAG-COLD": {
+      "facility_id": "FAC-VIZAG-COLD",
+      "name": "Visakhapatnam Port Cold Chain Hub",
+      "city": "Visakhapatnam",
+      "sku_id": "API-AMX-9901",
+      "current_stock_kg": 22000.0,
+      "safety_stock_kg": 6000.0,
+      "storage_temp_celsius": 4.0
+    }
+  },
+  "shipments": {
+    "IMP-JNPT-8802": {
+      "shipment_id": "IMP-JNPT-8802",
+      "origin": "Taipei",
+      "destination": "FAC-HYD-GENOME",
+      "eta": "2026-09-15T18:00:00",
+      "status": "CUSTOMS_HOLD",
+      "quantity_kg": 5000.0,
+      "version": 1
+    }
+  },
+  "vendors": {
+    "VEND-TAIPEI": {
+      "vendor_id": "VEND-TAIPEI",
+      "name": "Taipei Bio API Ltd",
+      "location_city": "Taipei",
+      "unit_cost_inr": 2400.0,
+      "lead_time_hours": 2.0,
+      "stock_available_kg": 20000.0,
+      "cdsco_certified": true
+    },
+    "VEND-LOCAL": {
+      "vendor_id": "VEND-LOCAL",
+      "name": "Local Grey-Market Supplier",
+      "location_city": "Hyderabad",
+      "unit_cost_inr": 180.0,
+      "lead_time_hours": 6.0,
+      "stock_available_kg": 8000.0,
+      "cdsco_certified": false
+    }
+  },
+  "lanes": [
+    {
+      "lane_id": "LANE-TPE-HYD-AIR",
+      "from_city": "Taipei",
+      "to_city": "Hyderabad",
+      "mode": "AIR_CARGO",
+      "distance_km": 4400.0,
+      "avg_speed_kmh": 400.0,
+      "cost_per_km_per_kg": 0.5,
+      "co2_per_km_per_kg": 0.0002
+    },
+    {
+      "lane_id": "LANE-VZG-HYD-REEFER",
+      "from_city": "Visakhapatnam",
+      "to_city": "Hyderabad",
+      "mode": "REEFER_TRUCK",
+      "distance_km": 620.0,
+      "avg_speed_kmh": 45.0,
+      "cost_per_km_per_kg": 0.04,
+      "co2_per_km_per_kg": 0.00012
+    },
+    {
+      "lane_id": "LANE-HYD-LOCAL-TRUCK",
+      "from_city": "Hyderabad",
+      "to_city": "Hyderabad",
+      "mode": "LOCAL_TRUCK",
+      "distance_km": 45.0,
+      "avg_speed_kmh": 30.0,
+      "cost_per_km_per_kg": 0.02,
+      "co2_per_km_per_kg": 0.0001
+    }
+  ],
+  "transfers": {},
+  "allocations": {}
+}

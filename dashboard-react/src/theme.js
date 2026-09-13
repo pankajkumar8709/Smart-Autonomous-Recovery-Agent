@@ -1,0 +1,47 @@
+// Light theme design tokens. Consumed through styled-components' ThemeProvider,
+// so every styled component reads colors/spacing from props.theme — no hardcoded
+// hex scattered across components.
+export const theme = {
+  colors: {
+    bg: "#f4f6fb",
+    bgGradient: "radial-gradient(1200px 600px at 15% -10%, #eaf0ff 0%, #f4f6fb 55%)",
+    surface: "#ffffff",
+    surfaceAlt: "#f8fafc",
+    border: "#e4e8f0",
+    borderStrong: "#d3d9e6",
+    text: "#1b2436",
+    textMuted: "#68758c",
+    textFaint: "#94a1b8",
+    accent: "#3b6fff",
+    accentSoft: "#eaf0ff",
+    green: "#10b981",
+    greenSoft: "#e7f7f1",
+    amber: "#f59e0b",
+    amberSoft: "#fdf3e2",
+    red: "#ef4444",
+    redSoft: "#fdeaea",
+    violet: "#8b5cf6",
+    violetSoft: "#f1ecfe",
+    cyan: "#0891b2",
+    cyanSoft: "#e5f6fb",
+  },
+  // Per-node accent used by the timeline cards (light chips on white).
+  node: {
+    observe: { fg: "#0e7490", bg: "#e5f6fb" },
+    detect: { fg: "#b45309", bg: "#fdf3e2" },
+    investigate: { fg: "#6d28d9", bg: "#f1ecfe" },
+    optimize: { fg: "#1d4ed8", bg: "#e7edfe" },
+    governance: { fg: "#be123c", bg: "#fde8ec" },
+    execute: { fg: "#047857", bg: "#e7f7f1" },
+    verify: { fg: "#0e7490", bg: "#e5f6fb" },
+  },
+  radius: { sm: "8px", md: "12px", lg: "16px", xl: "20px", pill: "999px" },
+  shadow: {
+    card: "0 1px 2px rgba(27,36,54,.04), 0 8px 24px rgba(27,36,54,.06)",
+    hover: "0 4px 12px rgba(59,111,255,.18)",
+    lift: "0 12px 32px rgba(27,36,54,.10)",
+  },
+  space: (n) => `${n * 4}px`,
+  font: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif",
+  mono: "'SFMono-Regular', ui-monospace, 'Cascadia Code', Menlo, Consolas, monospace",
+};

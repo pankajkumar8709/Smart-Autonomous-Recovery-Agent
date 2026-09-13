@@ -1,0 +1,33 @@
+# --- Agent + sandbox runtime state (regenerated; never commit) ---
+agent_state.db
+agent_state.db-shm
+agent_state.db-wal
+sandbox_snapshot.json
+run_history.json
+
+# --- Python ---
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+
+# --- Node / dashboard ---
+dashboard-react/node_modules/
+dashboard-react/dist/
+*.local
+
+# --- Logs and transient output ---
+*.log
+*.log.err
+*.err.log
+sse_*.txt
+*.out.txt
+
+# --- Tooling / local workspace metadata ---
+.freebuff/
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

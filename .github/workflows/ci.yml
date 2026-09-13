@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  unit:
+    name: Unit tests (no sandbox)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Run unit tests
+        run: python -m pytest -v -m "not integration"
+
+  integration:
+    name: Integration (agent vs live sandbox)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Boot the sandbox (ephemeral, in-memory)
+        run: |
+          SANDBOX_PERSIST=0 python -m uvicorn sandbox_api:app \
+            --host 127.0.0.1 --port 8000 &
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8000/api/v1/health && break
+            sleep 1
+          done
+          curl -sf http://127.0.0.1:8000/api/v1/health
+      - name: Run full suite against the live sandbox
+        run: python -m pytest -v
+        env:
+          SANDBOX_PORT: "8000"
+
+  dashboard:
+    name: Dashboard build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: dashboard-react
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: dashboard-react/package-lock.json
+      - run: npm ci
+      - run: npm run build
